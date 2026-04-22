@@ -45,7 +45,6 @@ const hexToRgba = (hex, alpha) => {
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 };
 
-// --- EMETH SVG (NET ET SANS FLOU CSS) ---
 const EmethHead = ({ className }) => (
   <svg viewBox="0 0 140 140" className={className}>
     <circle cx="70" cy="70" r="70" fill="#E9D5FF" />
@@ -143,7 +142,7 @@ export default function App() {
   // ÉTATS ÉDITION DE TÂCHE
   const [editingTask, setEditingTask] = useState(null);
   const [editTaskTitle, setEditTaskTitle] = useState('');
-  const [editTaskDateDisplay, setEditTaskDateDisplay] = useState(''); // Affichage jj/mm/aaaa
+  const [editTaskDateDisplay, setEditTaskDateDisplay] = useState(''); 
   const [editTaskTime, setEditTaskTime] = useState('');
   const [editTaskCategoryId, setEditTaskCategoryId] = useState('');
 
@@ -290,7 +289,6 @@ export default function App() {
     }
   };
 
-  // --- OUVERTURE DE L'ÉDITION AVEC FORMATAGE DE DATE ---
   const openEditModal = (task) => {
     setEditTaskTitle(task.title);
     
@@ -306,7 +304,6 @@ export default function App() {
     setEditingTask(task);
   };
 
-  // --- SAUVEGARDE DE L'ÉDITION ---
   const handleUpdateTask = async (e) => {
     e.preventDefault();
     if (!editingTask || !editTaskTitle.trim() || !user) return;
@@ -384,7 +381,6 @@ export default function App() {
     setExpandedTasks(prev => ({ ...prev, [taskId]: !prev[taskId] }));
   };
 
-  // --- GESTION TEXTUELLE DES HEURES ET DES DATES ---
   const handleTimeChange = (e, setter) => {
     let val = e.target.value.replace(/[^0-9:]/g, '');
     if (val.length > 5) val = val.substring(0, 5);
@@ -426,7 +422,6 @@ export default function App() {
     setEditTaskDateDisplay(formatted);
   };
 
-  // --- LE CERVEAU D'EMETH (SURVOL & CLIC) ---
   const getEmethContent = () => {
     const uncompletedTasks = tasks.filter(t => !t.completed);
     
@@ -627,7 +622,7 @@ export default function App() {
     for (let i = 1; i <= daysInMonth; i++) days.push(i);
 
     return (
-      <div className="bg-white/80 backdrop-blur-xl rounded-[2rem] p-4 sm:p-6 shadow-xl shadow-indigo-100/50 border border-white max-w-6xl mx-auto flex flex-col h-[75vh]">
+      <div className="bg-white/80 backdrop-blur-xl rounded-[2rem] p-4 sm:p-6 shadow-xl shadow-indigo-100/50 border border-white mx-auto flex flex-col h-[75vh] w-full max-w-6xl">
         <div className="flex flex-col sm:flex-row items-center justify-between mb-4 sm:mb-6 gap-3 sm:gap-4">
           <h3 className="text-xl sm:text-2xl font-black text-slate-800 capitalize">{monthNames[month]} {year}</h3>
           <div className="flex gap-2 w-full sm:w-auto justify-between sm:justify-start">
@@ -671,10 +666,19 @@ export default function App() {
 
   return (
     <div 
-      className="min-h-screen font-sans flex flex-col overflow-hidden selection:bg-[#E9D5FF] transition-colors duration-700 ease-in-out"
+      className="w-full min-h-screen font-sans flex flex-col overflow-hidden selection:bg-[#E9D5FF] transition-colors duration-700 ease-in-out"
       style={{ backgroundColor: '#ffffff', backgroundImage: `linear-gradient(135deg, #ffffff 0%, ${hexToRgba(activeColor, 0.20)} 100%)` }}
     >
       <style>{`
+        /* SUPPRESSION DES BORDURES NOIRES VITE.JS */
+        :root, #root, html, body {
+          margin: 0 !important;
+          padding: 0 !important;
+          max-width: none !important;
+          width: 100% !important;
+          min-height: 100vh !important;
+        }
+
         @keyframes hoverBot { 0%, 100% { transform: translateY(0) translateX(0) rotate(0deg); } 25% { transform: translateY(-12px) translateX(-6px) rotate(-3deg); } 50% { transform: translateY(-4px) translateX(-16px) rotate(2deg); } 75% { transform: translateY(-16px) translateX(-4px) rotate(-2deg); } }
         @keyframes armWave { 0%, 100% { transform: rotate(-5deg); } 50% { transform: rotate(5deg); } }
         @keyframes forearmWave { 0%, 100% { transform: rotate(-25deg); } 50% { transform: rotate(25deg); } }
@@ -693,7 +697,7 @@ export default function App() {
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
       `}</style>
 
-      <header className="px-4 sm:px-6 py-4 flex items-center justify-between shrink-0 bg-white/40 backdrop-blur-md z-10 relative">
+      <header className="w-full px-4 sm:px-6 py-4 flex items-center justify-between shrink-0 bg-white/40 backdrop-blur-md z-10 relative">
         <div className="flex items-center gap-2 sm:gap-3 text-[#8B5CF6]">
           <div className="flex items-center justify-center rounded-full drop-shadow-sm">
             <EmethHead className="w-10 h-10 sm:w-14 sm:h-14" />
@@ -726,7 +730,7 @@ export default function App() {
         </div>
       </header>
 
-      <nav className="flex items-center gap-2 sm:gap-3 px-4 sm:px-6 py-3 overflow-x-auto no-scrollbar bg-white/30 backdrop-blur-md border-b border-white/50 shadow-sm shrink-0 relative z-10">
+      <nav className="w-full flex items-center justify-center sm:justify-start gap-2 sm:gap-3 px-4 sm:px-6 py-3 overflow-x-auto no-scrollbar bg-white/30 backdrop-blur-md border-b border-white/50 shadow-sm shrink-0 relative z-10">
         <button onClick={() => setCurrentFilter('all')} className={`px-4 py-2 sm:py-2.5 rounded-2xl text-sm font-bold whitespace-nowrap transition-all active:scale-95 flex items-center gap-2 shrink-0 ${currentFilter === 'all' ? 'bg-slate-800 text-white shadow-lg scale-105' : 'bg-white/80 text-slate-600 hover:bg-white hover:shadow-sm'}`}>
           <List className="w-4 h-4"/> Toutes
         </button>
@@ -748,16 +752,16 @@ export default function App() {
         <button onClick={() => setCurrentFilter('calendar')} className={`px-3 py-2 rounded-xl text-xs sm:text-sm font-bold whitespace-nowrap transition-all active:scale-95 flex items-center gap-1.5 shrink-0 ${currentFilter === 'calendar' ? 'bg-[#8B5CF6] text-white shadow-md scale-105' : 'bg-white/60 text-slate-500 hover:bg-white'}`}><Calendar className="w-3.5 h-3.5"/> Calendrier</button>
       </nav>
 
-      <main className="flex-1 overflow-y-auto px-4 sm:px-6 pt-4 sm:pt-6 pb-32 space-y-4 sm:space-y-6 relative z-0">
+      <main className="w-full flex-1 overflow-y-auto px-4 sm:px-6 pt-4 sm:pt-6 pb-32 space-y-4 sm:space-y-6 relative z-0 flex flex-col items-center">
         {currentFilter === 'calendar' ? (
           renderCalendar()
         ) : (
-          <>
-            <form onSubmit={handleCreateTask} className="bg-white/90 backdrop-blur-xl rounded-[1.5rem] sm:rounded-[2rem] p-2 shadow-xl shadow-indigo-100/50 border border-white flex flex-col sm:flex-row items-center gap-2 max-w-5xl mx-auto relative z-20">
+          <div className="w-full max-w-5xl flex flex-col gap-4 sm:gap-6">
+            <form onSubmit={handleCreateTask} className="w-full bg-white/90 backdrop-blur-xl rounded-[1.5rem] sm:rounded-[2rem] p-2 shadow-xl shadow-indigo-100/50 border border-white flex flex-col sm:flex-row items-center gap-2 relative z-20">
               <input 
                 type="text" 
                 placeholder="Que voulez-vous accomplir ?" 
-                className="flex-1 w-full sm:w-auto bg-transparent border-none outline-none px-4 py-2 sm:py-3 text-slate-700 placeholder:text-slate-400 font-bold text-base sm:text-lg min-w-[120px]"
+                className="flex-1 w-full bg-transparent border-none outline-none px-4 py-2 sm:py-3 text-slate-700 placeholder:text-slate-400 font-bold text-base sm:text-lg min-w-[120px]"
                 value={newTaskTitle} onChange={(e) => setNewTaskTitle(e.target.value)}
               />
               
@@ -803,7 +807,7 @@ export default function App() {
               </div>
             </form>
 
-            <div className="space-y-3 sm:space-y-4 max-w-5xl mx-auto relative z-10 mt-6">
+            <div className="w-full space-y-3 sm:space-y-4 relative z-10">
               {filteredTasks.length === 0 ? (
                 <div className="text-center py-16 sm:py-20 text-slate-400">
                   <div className="w-20 h-20 sm:w-24 sm:h-24 flex items-center justify-center mx-auto mb-4 drop-shadow-md">
@@ -833,7 +837,7 @@ export default function App() {
                   }
 
                   return (
-                    <div key={task.id} className={`rounded-[1.5rem] sm:rounded-[2rem] transition-all duration-300 overflow-hidden ${cardStyle}`}>
+                    <div key={task.id} className={`w-full rounded-[1.5rem] sm:rounded-[2rem] transition-all duration-300 overflow-hidden ${cardStyle}`}>
                       <div className="w-full h-1.5 bg-slate-100">
                         <div className={`h-full transition-all duration-500 ease-out ${isOverdue ? 'bg-gradient-to-r from-red-500 to-rose-500' : 'bg-gradient-to-r from-[#8B5CF6] to-[#D946EF]'}`} style={{ width: `${progressPercent}%` }} />
                       </div>
@@ -906,11 +910,10 @@ export default function App() {
                 })
               )}
             </div>
-          </>
+          </div>
         )}
       </main>
 
-      {/* --- NOUVEL EMETH : PETITE BULLE FLOTTANTE --- */}
       <div 
         className="fixed bottom-6 right-4 sm:right-6 lg:bottom-10 lg:right-10 z-40 flex flex-col items-end"
         onMouseEnter={() => setIsEmethHovered(true)}
@@ -930,7 +933,6 @@ export default function App() {
           onClick={() => setIsEmethExpanded(!isEmethExpanded)} 
           className="group cursor-pointer focus:outline-none relative bot-animate"
         >
-          {/* Suppression des ombres externes du bouton pour un rendu 100% net du SVG */}
           <div className={`absolute inset-0 bg-[#E9D5FF] rounded-full blur-xl transition-all duration-500 ${isEmethExpanded ? 'opacity-60 scale-150' : 'opacity-0'}`}></div>
           <svg width="70" height="70" viewBox="0 0 100 100" className="relative z-10 sm:w-[80px] sm:h-[80px] hover:scale-110 active:scale-95 transition-transform duration-300">
             <path d="M50 25 L50 10" stroke="#CBD5E1" strokeWidth="4" strokeLinecap="round" />
@@ -947,7 +949,6 @@ export default function App() {
         </button>
       </div>
 
-      {/* --- MODAL EDIT TASK AVEC CHAMP DATE TEXTUEL --- */}
       {editingTask && (
         <div className="fixed inset-0 z-[80] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setEditingTask(null)} />
@@ -989,7 +990,6 @@ export default function App() {
         </div>
       )}
 
-      {/* --- MODAL CATEGORIE --- */}
       {isCategoryModalOpen && (
         <div className="fixed inset-0 z-[80] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setIsCategoryModalOpen(false)} />
@@ -1016,7 +1016,6 @@ export default function App() {
         </div>
       )}
 
-      {/* --- MODAL RÉGLAGES --- */}
       {isSettingsOpen && (
         <div className="fixed inset-0 z-[90] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setIsSettingsOpen(false)} />
