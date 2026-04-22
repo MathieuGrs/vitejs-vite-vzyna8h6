@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
   Check, Circle, Plus, Trash, Calendar, List, Tag,
   X, ChevronDown, ChevronUp, Palette, AlertCircle,
-  Send, Clock, ChevronLeft, ChevronRight, LogOut, Settings, User
+  Clock, ChevronLeft, ChevronRight, LogOut, Settings, User, Pencil
 } from 'lucide-react';
 import { initializeApp } from 'firebase/app';
 import { 
@@ -45,6 +45,7 @@ const hexToRgba = (hex, alpha) => {
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 };
 
+// --- EMETH SVG (NET ET SANS FLOU CSS) ---
 const EmethHead = ({ className }) => (
   <svg viewBox="0 0 140 140" className={className}>
     <circle cx="70" cy="70" r="70" fill="#E9D5FF" />
@@ -125,7 +126,6 @@ export default function App() {
   const [categories, setCategories] = useState([]);
   
   const [currentFilter, setCurrentFilter] = useState('all');
-  const [isAssistantOpen, setIsAssistantOpen] = useState(false);
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState('');
   const [newCategoryColor, setNewCategoryColor] = useState(CATEGORY_COLORS[0]);
@@ -134,18 +134,22 @@ export default function App() {
   const [newTaskDate, setNewTaskDate] = useState('');
   const [newTaskTime, setNewTaskTime] = useState('');
   const [newTaskCategoryId, setNewTaskCategoryId] = useState('');
+  
   const [expandedTasks, setExpandedTasks] = useState({});
   const [calendarMonth, setCalendarMonth] = useState(new Date());
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
   const [pickerMonth, setPickerMonth] = useState(new Date());
 
-  // MESSAGES INTRODUCTIFS D'EMETH HORS-LIGNE
-  const [messages, setMessages] = useState([
-    { role: 'assistant', text: "Coucou ! 👋 Je suis Emeth. Je suis maintenant équipé d'un moteur d'analyse ultra-rapide 100% hors-ligne." },
-    { role: 'assistant', text: "Dites-moi par exemple : 'Planifie un footing demain à 18h30 dans la catégorie Sport' !" }
-  ]);
-  const [inputMessage, setInputMessage] = useState('');
-  const messagesEndRef = useRef(null);
+  // ÉTATS ÉDITION DE TÂCHE
+  const [editingTask, setEditingTask] = useState(null);
+  const [editTaskTitle, setEditTaskTitle] = useState('');
+  const [editTaskDateDisplay, setEditTaskDateDisplay] = useState(''); // Affichage jj/mm/aaaa
+  const [editTaskTime, setEditTaskTime] = useState('');
+  const [editTaskCategoryId, setEditTaskCategoryId] = useState('');
+
+  // ÉTATS EMETH
+  const [isEmethHovered, setIsEmethHovered] = useState(false);
+  const [isEmethExpanded, setIsEmethExpanded] = useState(false);
 
   useEffect(() => {
     if (categories.find(c => c.id === currentFilter)) {
@@ -179,7 +183,7 @@ export default function App() {
         await signInWithEmailAndPassword(auth, email, password);
       }
     } catch (err) {
-      setAuthError("Erreur : Vérifiez vos identifiants ou le format du mot de passe (6 caractères min).");
+      setAuthError("Erreur : Identifiants invalides ou mot de passe trop court.");
     }
   };
 
@@ -205,10 +209,10 @@ export default function App() {
       if (settingsPassword) {
         await updatePassword(user, settingsPassword);
       }
-      setSettingsMessage("✅ Réglages sauvegardés avec succès !");
+      setSettingsMessage("✅ Réglages sauvegardés !");
       setTimeout(() => setIsSettingsOpen(false), 1500);
     } catch (err) {
-      setSettingsMessage("❌ Erreur de sauvegarde. Déconnectez-vous et réessayez.");
+      setSettingsMessage("❌ Erreur de sauvegarde.");
     }
   };
 
@@ -227,10 +231,6 @@ export default function App() {
     return () => { unsubCategories(); unsubTasks(); };
   }, [user]);
 
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
-
   const handleCreateCategory = async (e) => {
     e.preventDefault();
     if (!newCategoryName.trim() || !user) return;
@@ -238,18 +238,18 @@ export default function App() {
     const catName = newCategoryName.trim();
     const catColor = newCategoryColor;
 
-    setIsCategoryModalOpen(false); 
-    setNewCategoryName('');
-    setNewCategoryColor(CATEGORY_COLORS[0]);
-
     try {
       await addDoc(collection(db, 'users', user.uid, 'categories'), {
         name: catName,
         color: catColor,
         createdAt: new Date().toISOString()
       });
+
+      setIsCategoryModalOpen(false); 
+      setNewCategoryName('');
+      setNewCategoryColor(CATEGORY_COLORS[0]);
     } catch (err) {
-      alert("❌ Impossible de créer la catégorie.\nErreur technique : " + err.message);
+      alert("❌ Impossible de créer la catégorie.\nErreur : " + err.message);
     }
   };
 
@@ -286,7 +286,47 @@ export default function App() {
         createdAt: new Date().toISOString()
       });
     } catch(err) {
-      alert("❌ Impossible de créer la tâche.\nErreur technique : " + err.message);
+      alert("❌ Erreur de création.");
+    }
+  };
+
+  // --- OUVERTURE DE L'ÉDITION AVEC FORMATAGE DE DATE ---
+  const openEditModal = (task) => {
+    setEditTaskTitle(task.title);
+    
+    if (task.date) {
+      const [y, m, d] = task.date.split('-');
+      setEditTaskDateDisplay(`${d}/${m}/${y}`);
+    } else {
+      setEditTaskDateDisplay('');
+    }
+    
+    setEditTaskTime(task.time || '');
+    setEditTaskCategoryId(task.categoryId || '');
+    setEditingTask(task);
+  };
+
+  // --- SAUVEGARDE DE L'ÉDITION ---
+  const handleUpdateTask = async (e) => {
+    e.preventDefault();
+    if (!editingTask || !editTaskTitle.trim() || !user) return;
+
+    let parsedDate = null;
+    if (editTaskDateDisplay && editTaskDateDisplay.length === 10) {
+      const parts = editTaskDateDisplay.split('/');
+      if (parts.length === 3) parsedDate = `${parts[2]}-${parts[1]}-${parts[0]}`;
+    }
+
+    try {
+      await updateDoc(doc(db, 'users', user.uid, 'tasks', editingTask.id), {
+        title: editTaskTitle.trim(),
+        date: parsedDate,
+        time: editTaskTime || null,
+        categoryId: editTaskCategoryId || null
+      });
+      setEditingTask(null);
+    } catch (err) {
+      alert("❌ Erreur de mise à jour.");
     }
   };
 
@@ -344,139 +384,139 @@ export default function App() {
     setExpandedTasks(prev => ({ ...prev, [taskId]: !prev[taskId] }));
   };
 
-  const handleTimeChange = (e) => {
+  // --- GESTION TEXTUELLE DES HEURES ET DES DATES ---
+  const handleTimeChange = (e, setter) => {
     let val = e.target.value.replace(/[^0-9:]/g, '');
     if (val.length > 5) val = val.substring(0, 5);
-    setNewTaskTime(val);
+    setter(val);
   };
 
-  const formatTimeOnBlur = () => {
-    if (!newTaskTime) return;
-    let digits = newTaskTime.replace(/[^0-9]/g, ''); 
+  const formatTimeOnBlur = (timeVal, setter) => {
+    if (!timeVal) return;
+    let digits = timeVal.replace(/[^0-9]/g, ''); 
     if (digits.length === 1 || digits.length === 2) {
       let h = parseInt(digits, 10);
       if (h >= 0 && h <= 23) {
-        setNewTaskTime(String(h).padStart(2, '0') + ':00');
+        setter(String(h).padStart(2, '0') + ':00');
       } else {
-        setNewTaskTime(''); 
+        setter(''); 
       }
     } else if (digits.length === 3) {
       let h = parseInt(digits.substring(0, 1), 10);
       let m = parseInt(digits.substring(1, 3), 10);
       if (m > 59) m = 59;
-      setNewTaskTime('0' + h + ':' + String(m).padStart(2, '0'));
+      setter('0' + h + ':' + String(m).padStart(2, '0'));
     } else if (digits.length >= 4) {
       let h = parseInt(digits.substring(0, 2), 10);
       let m = parseInt(digits.substring(2, 4), 10);
       if (h > 23) h = 23;
       if (m > 59) m = 59;
-      setNewTaskTime(String(h).padStart(2, '0') + ':' + String(m).padStart(2, '0'));
+      setter(String(h).padStart(2, '0') + ':' + String(m).padStart(2, '0'));
     }
   };
 
-  // --- LE NOUVEAU PARSER LOCAL (ZÉRO IA, ZÉRO BUG) ---
-  const handleSendMessage = async (e) => {
-    e.preventDefault();
-    if (!inputMessage.trim()) return;
-    const userText = inputMessage.trim();
-    setInputMessage('');
+  const handleDateChangeText = (e) => {
+    let val = e.target.value.replace(/[^0-9]/g, '');
+    if (val.length > 8) val = val.substring(0, 8);
     
-    // Ajout du message utilisateur
-    setMessages(prev => [...prev, { role: 'user', text: userText }]);
+    let formatted = val;
+    if (val.length >= 3) formatted = val.substring(0, 2) + '/' + val.substring(2);
+    if (val.length >= 5) formatted = formatted.substring(0, 5) + '/' + val.substring(4);
+    
+    setEditTaskDateDisplay(formatted);
+  };
 
-    // Variables pour capturer les données
-    let detectedDate = null;
-    let detectedTime = null;
-    let detectedCatId = null;
-    let cleanTitle = userText;
-    const textLower = userText.toLowerCase();
-
-    // 1. Parsing de la Date
-    const today = new Date();
-    if (textLower.includes("aujourd'hui") || textLower.includes("auj")) {
-      detectedDate = today.toISOString().split('T')[0];
-      cleanTitle = cleanTitle.replace(/aujourd'hui|auj/gi, '');
-    } else if (textLower.includes("demain")) {
-      const tomorrow = new Date(today);
-      tomorrow.setDate(tomorrow.getDate() + 1);
-      detectedDate = tomorrow.toISOString().split('T')[0];
-      cleanTitle = cleanTitle.replace(/demain/gi, '');
-    }
-
-    // 2. Parsing de l'Heure (ex: 14h30, 14:30, 14h, midi)
-    const timeRegex = /(?:à\s)?(\d{1,2})h(\d{2})?|(\d{1,2}):(\d{2})/i;
-    const timeMatch = cleanTitle.match(timeRegex);
-    if (timeMatch) {
-      let h = timeMatch[1] || timeMatch[3];
-      let m = timeMatch[2] || timeMatch[4] || '00';
-      detectedTime = `${h.padStart(2, '0')}:${m.padStart(2, '0')}`;
-      cleanTitle = cleanTitle.replace(timeMatch[0], ''); // Retire l'heure du titre
-    } else if (textLower.includes("midi")) {
-      detectedTime = "12:00";
-      cleanTitle = cleanTitle.replace(/midi/gi, '');
-    } else if (textLower.includes("minuit")) {
-      detectedTime = "00:00";
-      cleanTitle = cleanTitle.replace(/minuit/gi, '');
-    }
-
-    // 3. Parsing de la Catégorie
-    categories.forEach(cat => {
-      // On cherche si le nom de la catégorie est dans le texte
-      if (textLower.includes(cat.name.toLowerCase())) {
-        detectedCatId = cat.id;
-        // On retire le nom de la catégorie ou "dans (catégorie)" du titre
-        const catRegex = new RegExp(`(?:dans la catégorie |dans )?${cat.name}`, 'gi');
-        cleanTitle = cleanTitle.replace(catRegex, '');
-      }
+  // --- LE CERVEAU D'EMETH (SURVOL & CLIC) ---
+  const getEmethContent = () => {
+    const uncompletedTasks = tasks.filter(t => !t.completed);
+    
+    const sortedTasks = [...uncompletedTasks].sort((a, b) => {
+      const aOverdue = isTaskOverdue(a.date, a.time);
+      const bOverdue = isTaskOverdue(b.date, b.time);
+      
+      if (aOverdue && !bOverdue) return -1;
+      if (!aOverdue && bOverdue) return 1;
+      
+      const dateA = a.date || "9999-12-31";
+      const dateB = b.date || "9999-12-31";
+      if (dateA !== dateB) return dateA.localeCompare(dateB);
+      
+      const timeA = a.time || "23:59";
+      const timeB = b.time || "23:59";
+      return timeA.localeCompare(timeB);
     });
 
-    // 4. Nettoyage du titre final
-    // Retire les mots d'ordre inutiles
-    cleanTitle = cleanTitle.replace(/^(planifie|ajoute|crée|créer|rappelle-moi de|nouveau|nouvelle)\s(un|une|des)?\s?/i, '');
-    // Retire la ponctuation parasite et les espaces en trop
-    cleanTitle = cleanTitle.replace(/^[\s,:-]+|[\s,:-]+$/g, '').trim();
-    
-    // Majuscule au début
-    if (cleanTitle.length > 0) {
-      cleanTitle = cleanTitle.charAt(0).toUpperCase() + cleanTitle.slice(1);
-    } else {
-      cleanTitle = "Nouvelle tâche";
+    const mostUrgent = sortedTasks[0];
+    const top3 = sortedTasks.slice(0, 3);
+
+    const name = userName ? ` ${userName}` : '';
+    const cheers = [
+      `Salut${name} ! Moi c'est Emeth, ton assistant 🤖`,
+      `Belle journée pour avancer${name} ! ☀️`,
+      `Je suis là si tu as besoin. Ton bureau est bien rangé ! ✨`,
+      `Tu gères${name ? ','+name : ''}. 💪`,
+      `Zen... Tu es à jour dans tes tâches ! 🧘‍♂️`
+    ];
+
+    const randomCheer = cheers[Math.floor(Math.random() * cheers.length)];
+
+    if (!isEmethExpanded) {
+      if (!mostUrgent) {
+        return <div className="text-sm font-bold text-slate-700 text-center">{randomCheer}</div>;
+      }
+      
+      const isOverdue = isTaskOverdue(mostUrgent.date, mostUrgent.time);
+      
+      return (
+        <div className="flex flex-col gap-1">
+          {isOverdue ? (
+             <span className="text-xs font-black text-red-500 flex items-center gap-1">⚠️ Attention, retard !</span>
+          ) : (
+             <span className="text-xs text-slate-500 font-medium">Ta prochaine mission :</span>
+          )}
+          <span className={`text-sm font-bold ${isOverdue ? 'text-red-700' : 'text-slate-800'}`}>{mostUrgent.title}</span>
+        </div>
+      );
     }
 
-    // 5. Création de la tâche dans Firebase
-    try {
-      await addDoc(collection(db, 'users', user.uid, 'tasks'), {
-        title: cleanTitle,
-        date: detectedDate,
-        time: detectedTime,
-        categoryId: detectedCatId,
-        completed: false,
-        subtasks: [],
-        createdAt: new Date().toISOString()
-      });
-
-      // Réponse de succès d'Emeth
-      let reply = `C'est noté ! J'ai ajouté "${cleanTitle}"`;
-      if (detectedDate || detectedTime) {
-        reply += ` pour ${detectedDate ? (detectedDate === today.toISOString().split('T')[0] ? "aujourd'hui" : "demain") : ""} ${detectedTime ? 'à '+detectedTime : ''}`;
+    if (isEmethExpanded) {
+      if (sortedTasks.length === 0) {
+        return (
+          <div className="text-center py-4">
+            <p className="text-sm font-bold text-slate-700 mb-2">Tout est vide !</p>
+            <p className="text-xs text-slate-500">Repose-toi bien. ☀️</p>
+          </div>
+        );
       }
-      reply += " 🚀";
-      
-      setMessages(prev => [...prev, { role: 'assistant', text: reply.replace(/\s+/g, ' ') }]);
 
-    } catch (error) {
-      setMessages(prev => [...prev, { role: 'assistant', text: "Oups, je n'ai pas réussi à l'enregistrer dans votre base de données. 😕" }]);
+      return (
+        <div className="flex flex-col max-h-[300px]">
+          <h3 className="font-black text-slate-800 text-base mb-3 pb-2 border-b border-slate-100">
+            {sortedTasks.length > 3 ? "Tes 3 priorités" : "Tes tâches en cours"}
+          </h3>
+          <div className="overflow-y-auto no-scrollbar space-y-3">
+            {top3.map(task => {
+              const isOverdue = isTaskOverdue(task.date, task.time);
+              return (
+                <div key={task.id} className={`flex flex-col border-l-[3px] pl-3 py-1 ${isOverdue ? 'border-red-500 bg-red-50/50 rounded-r-lg' : 'border-[#8B5CF6]'}`}>
+                  <span className={`text-sm font-bold leading-tight ${isOverdue ? 'text-red-700' : 'text-slate-700'}`}>{task.title}</span>
+                  {(task.date || task.time) && (
+                    <span className={`text-[10px] font-bold mt-1 flex items-center gap-1 ${isOverdue ? 'text-red-500' : 'text-slate-400'}`}>
+                      {task.date && new Date(task.date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })} 
+                      {task.time && ` • ${task.time}`}
+                    </span>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      );
     }
   };
 
   const getFilteredTasks = () => {
     let filtered = [...tasks];
-    const today = new Date().toISOString().split('T')[0];
-    
-    if (currentFilter === 'today') filtered = filtered.filter(t => t.date === today);
-    else if (currentFilter === 'upcoming') filtered = filtered.filter(t => t.date && t.date > today);
-    else if (currentFilter !== 'all' && currentFilter !== 'calendar') filtered = filtered.filter(t => t.categoryId === currentFilter);
-
     filtered.sort((a, b) => {
       if (a.completed !== b.completed) return a.completed ? 1 : -1;
       const dateA = a.date || "9999-12-31";
@@ -488,6 +528,17 @@ export default function App() {
       return (b.createdAt || "").localeCompare(a.createdAt || "");
     });
     
+    if (currentFilter === 'today') {
+      const today = new Date().toISOString().split('T')[0];
+      return filtered.filter(t => t.date === today);
+    }
+    if (currentFilter === 'upcoming') {
+      const today = new Date().toISOString().split('T')[0];
+      return filtered.filter(t => t.date && t.date > today);
+    }
+    if (currentFilter !== 'all' && currentFilter !== 'calendar') {
+      return filtered.filter(t => t.categoryId === currentFilter);
+    }
     return filtered;
   };
 
@@ -497,7 +548,6 @@ export default function App() {
 
   if (loadingAuth) {
     return <div className="min-h-screen flex items-center justify-center bg-white">
-      {/* On utilise un SVG direct au lieu du Loader lucide qui tournait mal parfois */}
       <svg className="animate-spin h-12 w-12 text-[#8B5CF6]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
     </div>;
   }
@@ -511,8 +561,7 @@ export default function App() {
           <p className="text-slate-500 mb-6 text-sm font-medium">Connectez-vous pour synchroniser vos tâches partout.</p>
           <form onSubmit={handleAuth} className="space-y-4">
             <input type="email" placeholder="Votre Email" value={email} onChange={e=>setEmail(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold text-slate-700 outline-none focus:border-[#8B5CF6] focus:ring-2 focus:ring-[#E9D5FF] transition-all" required />
-            <input type="password" placeholder="Mot de passe (6 carac. min)" value={password} onChange={e=>setPassword(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold text-slate-700 outline-none focus:border-[#8B5CF6] focus:ring-2 focus:ring-[#E9D5FF] transition-all" required />
-            
+            <input type="password" placeholder="Mot de passe" value={password} onChange={e=>setPassword(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold text-slate-700 outline-none focus:border-[#8B5CF6] focus:ring-2 focus:ring-[#E9D5FF] transition-all" required />
             {authError && <p className="text-red-500 text-xs font-bold mt-2">{authError}</p>}
             <button type="submit" className="w-full bg-slate-800 hover:bg-slate-900 active:scale-95 text-white font-bold py-3.5 rounded-xl transition-all shadow-md mt-4">
               {isRegistering ? "Créer mon compte" : "Se connecter"}
@@ -528,13 +577,13 @@ export default function App() {
 
   const renderMiniCalendar = () => {
     const year = pickerMonth.getFullYear(); const month = pickerMonth.getMonth();
+    const monthNames = ["Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"];
     const daysInMonth = new Date(year, month + 1, 0).getDate();
     const firstDayOfMonth = new Date(year, month, 1).getDay();
     const startOffset = firstDayOfMonth === 0 ? 6 : firstDayOfMonth - 1;
     const days = [];
     for (let i = 0; i < startOffset; i++) days.push(null);
     for (let i = 1; i <= daysInMonth; i++) days.push(i);
-    const monthNames = ["Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"];
 
     return (
       <div className="w-full sm:w-[250px]">
@@ -569,13 +618,13 @@ export default function App() {
 
   const renderCalendar = () => {
     const year = calendarMonth.getFullYear(); const month = calendarMonth.getMonth();
+    const monthNames = ["Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"];
     const daysInMonth = new Date(year, month + 1, 0).getDate();
     const firstDayOfMonth = new Date(year, month, 1).getDay();
     const startOffset = firstDayOfMonth === 0 ? 6 : firstDayOfMonth - 1; 
     const days = [];
     for (let i = 0; i < startOffset; i++) days.push(null);
     for (let i = 1; i <= daysInMonth; i++) days.push(i);
-    const monthNames = ["Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"];
 
     return (
       <div className="bg-white/80 backdrop-blur-xl rounded-[2rem] p-4 sm:p-6 shadow-xl shadow-indigo-100/50 border border-white max-w-6xl mx-auto flex flex-col h-[75vh]">
@@ -632,7 +681,6 @@ export default function App() {
         @keyframes pincerLeftOpen { 0%, 100% { transform: rotate(0deg); } 50% { transform: rotate(-25deg); } }
         @keyframes pincerRightOpen { 0%, 100% { transform: rotate(0deg); } 50% { transform: rotate(25deg); } }
         
-        /* EFFET DE FLOTTEMENT DOUX POUR LE RETARD */
         @keyframes gentleFloat { 0%, 100% { transform: translateY(0px); } 50% { transform: translateY(-3px); } }
         .animate-gentle-float { animation: gentleFloat 3.5s ease-in-out infinite; }
         
@@ -645,7 +693,6 @@ export default function App() {
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
       `}</style>
 
-      {/* --- HEADER --- */}
       <header className="px-4 sm:px-6 py-4 flex items-center justify-between shrink-0 bg-white/40 backdrop-blur-md z-10 relative">
         <div className="flex items-center gap-2 sm:gap-3 text-[#8B5CF6]">
           <div className="flex items-center justify-center rounded-full drop-shadow-sm">
@@ -679,7 +726,6 @@ export default function App() {
         </div>
       </header>
 
-      {/* --- NAVIGATION --- */}
       <nav className="flex items-center gap-2 sm:gap-3 px-4 sm:px-6 py-3 overflow-x-auto no-scrollbar bg-white/30 backdrop-blur-md border-b border-white/50 shadow-sm shrink-0 relative z-10">
         <button onClick={() => setCurrentFilter('all')} className={`px-4 py-2 sm:py-2.5 rounded-2xl text-sm font-bold whitespace-nowrap transition-all active:scale-95 flex items-center gap-2 shrink-0 ${currentFilter === 'all' ? 'bg-slate-800 text-white shadow-lg scale-105' : 'bg-white/80 text-slate-600 hover:bg-white hover:shadow-sm'}`}>
           <List className="w-4 h-4"/> Toutes
@@ -702,7 +748,6 @@ export default function App() {
         <button onClick={() => setCurrentFilter('calendar')} className={`px-3 py-2 rounded-xl text-xs sm:text-sm font-bold whitespace-nowrap transition-all active:scale-95 flex items-center gap-1.5 shrink-0 ${currentFilter === 'calendar' ? 'bg-[#8B5CF6] text-white shadow-md scale-105' : 'bg-white/60 text-slate-500 hover:bg-white'}`}><Calendar className="w-3.5 h-3.5"/> Calendrier</button>
       </nav>
 
-      {/* --- MAIN CONTENT --- */}
       <main className="flex-1 overflow-y-auto px-4 sm:px-6 pt-4 sm:pt-6 pb-32 space-y-4 sm:space-y-6 relative z-0">
         {currentFilter === 'calendar' ? (
           renderCalendar()
@@ -742,8 +787,8 @@ export default function App() {
                     type="text" inputMode="numeric" placeholder="12:00" maxLength="5"
                     className="w-full bg-transparent border-none p-0 text-xs sm:text-sm font-bold text-slate-600 outline-none text-center sm:text-left hidden sm:block"
                     value={newTaskTime} 
-                    onChange={handleTimeChange}
-                    onBlur={formatTimeOnBlur} 
+                    onChange={(e) => handleTimeChange(e, setNewTaskTime)}
+                    onBlur={() => formatTimeOnBlur(newTaskTime, setNewTaskTime)} 
                   />
                 </div>
 
@@ -780,7 +825,6 @@ export default function App() {
 
                   const isOverdue = !task.completed && isTaskOverdue(task.date, task.time);
 
-                  // DESIGN OPAQUE POUR LE RETARD
                   let cardStyle = 'bg-white/90 border-white shadow-slate-200/50 hover:shadow-xl';
                   if (task.completed) {
                     cardStyle = 'opacity-60 shadow-none bg-white/90 border-transparent';
@@ -803,7 +847,6 @@ export default function App() {
                           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 sm:gap-2">
                             <h3 className={`text-base sm:text-lg font-bold truncate transition-all flex items-center gap-2 ${task.completed ? 'text-slate-400 line-through' : (isOverdue ? 'text-red-600' : 'text-slate-800')}`}>
                               {task.title}
-                              {isOverdue && <AlertCircle className="w-4 h-4 text-red-500 animate-pulse" title="Tâche en retard" />}
                             </h3>
                             
                             <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 shrink-0">
@@ -816,11 +859,11 @@ export default function App() {
                               )}
                               <div className="relative flex items-center group/cat hover:scale-105 transition-transform shrink-0">
                                 <Tag className={`w-3 h-3 absolute left-2 pointer-events-none z-10 ${task.categoryId ? 'text-white' : 'text-slate-500'}`} />
-                                <select value={task.categoryId || ""} onChange={(e) => updateTaskCategory(task.id, e.target.value)} className={`appearance-none pl-6 pr-6 py-1 sm:py-1.5 rounded-lg sm:rounded-xl text-[10px] sm:text-xs font-bold w-[90px] sm:w-[110px] truncate transition-all cursor-pointer outline-none focus:ring-2 focus:ring-[#E9D5FF] focus:border-[#8B5CF6] ${task.categoryId ? 'text-white' : 'text-slate-600 bg-slate-100 hover:bg-[#E9D5FF]/40'}`} style={task.categoryId ? { backgroundColor: getCategoryColor(task.categoryId) } : {}}>
+                                <select value={task.categoryId || ""} onChange={(e) => updateTaskCategory(task.id, e.target.value)} className={`appearance-none pl-6 pr-8 py-1 sm:py-1.5 rounded-lg sm:rounded-xl text-[10px] sm:text-xs font-bold w-[100px] sm:w-[120px] truncate transition-all cursor-pointer outline-none focus:ring-2 focus:ring-[#E9D5FF] focus:border-[#8B5CF6] ${task.categoryId ? 'text-white' : 'text-slate-600 bg-slate-100 hover:bg-[#E9D5FF]/40'}`} style={task.categoryId ? { backgroundColor: getCategoryColor(task.categoryId) } : {}}>
                                   <option value="">Général</option>
                                   {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                                 </select>
-                                <ChevronDown className={`w-3 h-3 absolute right-1.5 pointer-events-none z-10 opacity-0 group-hover/cat:opacity-100 transition-opacity ${task.categoryId ? 'text-white' : 'text-slate-400'}`} />
+                                <ChevronDown className={`w-3 h-3 absolute right-3 pointer-events-none z-10 opacity-0 group-hover/cat:opacity-100 transition-opacity ${task.categoryId ? 'text-white' : 'text-slate-400'}`} />
                               </div>
                             </div>
                           </div>
@@ -831,7 +874,10 @@ export default function App() {
                               {(task.subtasks || []).length} sous-missions
                               {expandedTasks[task.id] ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
                             </button>
-                            <button onClick={() => deleteTask(task.id)} className={`p-1.5 rounded-full active:scale-95 transition-all ${isOverdue ? 'text-red-400 hover:text-red-600 hover:bg-red-50' : 'text-slate-300 hover:text-red-500 hover:bg-red-50'}`}><Trash className="w-4 h-4" /></button>
+                            <div className="flex gap-1">
+                              <button onClick={() => openEditModal(task)} className={`p-1.5 rounded-full active:scale-95 transition-all ${isOverdue ? 'text-red-400 hover:text-red-600 hover:bg-red-50' : 'text-slate-300 hover:text-[#8B5CF6] hover:bg-purple-50'}`}><Pencil className="w-4 h-4" /></button>
+                              <button onClick={() => deleteTask(task.id)} className={`p-1.5 rounded-full active:scale-95 transition-all ${isOverdue ? 'text-red-400 hover:text-red-600 hover:bg-red-50' : 'text-slate-300 hover:text-red-500 hover:bg-red-50'}`}><Trash className="w-4 h-4" /></button>
+                            </div>
                           </div>
                         </div>
                       </div>
@@ -845,7 +891,7 @@ export default function App() {
                                   {sub.completed ? <Check className="w-4 h-4 sm:w-5 sm:h-5" /> : <Circle className="w-4 h-4 sm:w-5 sm:h-5" />}
                                 </button>
                                 <span className={`text-xs sm:text-sm flex-1 ${sub.completed ? 'text-slate-400 line-through' : (isOverdue ? 'text-red-800 font-medium' : 'text-slate-700 font-medium')}`}>{sub.title}</span>
-                                <button onClick={() => deleteSubtask(task.id, sub.id)} className="opacity-0 group-hover:opacity-100 text-slate-300 hover:text-red-500 active:scale-95 p-1.5 rounded-full hover:bg-red-50 transition-all flex-shrink-0"><X className="w-3.5 h-3.5" /></button>
+                                <button onClick={() => deleteSubtask(task.id, sub.id)} className="opacity-100 sm:opacity-0 group-hover:opacity-100 text-slate-300 hover:text-red-500 active:scale-95 p-1.5 rounded-full hover:bg-red-50 transition-all flex-shrink-0"><X className="w-3.5 h-3.5" /></button>
                               </div>
                             ))}
                           </div>
@@ -864,67 +910,111 @@ export default function App() {
         )}
       </main>
 
-      {/* --- ROBOT FLOTTANT --- */}
-      {(!isAssistantOpen) && (
-        <button onClick={() => setIsAssistantOpen(true)} className="fixed bottom-6 right-4 sm:right-6 lg:bottom-10 lg:right-10 z-30 group bot-animate cursor-pointer focus:outline-none">
-          <div className="relative">
-            <div className="absolute bottom-full right-1/2 mb-3 bg-white text-slate-700 font-bold px-4 py-2 rounded-2xl rounded-br-sm shadow-xl opacity-0 group-hover:opacity-100 transition-all duration-300 whitespace-nowrap pointer-events-none text-sm border border-slate-100">
-              Je m'appelle Emeth, besoin d'aide ? 🤖
-            </div>
-            <svg width="70" height="70" viewBox="0 0 100 100" className="sm:w-[80px] sm:h-[80px] hover:scale-110 active:scale-95 transition-transform duration-300">
-              <path d="M50 25 L50 10" stroke="#CBD5E1" strokeWidth="4" strokeLinecap="round" />
-              <circle cx="50" cy="8" r="6" fill="#FFB86C" className="animate-ping" style={{animationDuration: '2s', transformOrigin: 'center'}} />
-              <circle cx="50" cy="8" r="6" fill="#FFB86C" />
-              <rect x="20" y="25" width="60" height="45" rx="15" fill="#8B5CF6" />
-              <rect x="28" y="33" width="44" height="25" rx="8" fill="#1E293B" />
-              <path d="M36 45 Q40 40 44 45" stroke="#34D399" strokeWidth="4" strokeLinecap="round" fill="none" />
-              <path d="M56 45 Q60 40 64 45" stroke="#34D399" strokeWidth="4" strokeLinecap="round" fill="none" />
-              <path d="M35 75 L65 75 L60 95 L40 95 Z" fill="#7C3AED" />
-              <path d="M15 50 Q5 60 15 75" stroke="#A78BFA" strokeWidth="6" strokeLinecap="round" fill="none" />
-              <path d="M85 50 Q95 60 85 75" stroke="#A78BFA" strokeWidth="6" strokeLinecap="round" fill="none" />
-            </svg>
+      {/* --- NOUVEL EMETH : PETITE BULLE FLOTTANTE --- */}
+      <div 
+        className="fixed bottom-6 right-4 sm:right-6 lg:bottom-10 lg:right-10 z-40 flex flex-col items-end"
+        onMouseEnter={() => setIsEmethHovered(true)}
+        onMouseLeave={() => setIsEmethHovered(false)}
+      >
+        <div className={`
+          mb-4 bg-white/95 backdrop-blur-xl border border-purple-100 shadow-2xl rounded-3xl rounded-br-sm 
+          transition-all duration-300 origin-bottom-right
+          ${(isEmethHovered || isEmethExpanded) ? 'opacity-100 scale-100 translate-y-0' : 'opacity-0 scale-95 translate-y-4 pointer-events-none'}
+        `}>
+          <div className={`p-4 ${isEmethExpanded ? 'w-[280px] sm:w-[320px]' : 'max-w-[250px]'}`}>
+            {getEmethContent()}
           </div>
+        </div>
+
+        <button 
+          onClick={() => setIsEmethExpanded(!isEmethExpanded)} 
+          className="group cursor-pointer focus:outline-none relative bot-animate"
+        >
+          {/* Suppression des ombres externes du bouton pour un rendu 100% net du SVG */}
+          <div className={`absolute inset-0 bg-[#E9D5FF] rounded-full blur-xl transition-all duration-500 ${isEmethExpanded ? 'opacity-60 scale-150' : 'opacity-0'}`}></div>
+          <svg width="70" height="70" viewBox="0 0 100 100" className="relative z-10 sm:w-[80px] sm:h-[80px] hover:scale-110 active:scale-95 transition-transform duration-300">
+            <path d="M50 25 L50 10" stroke="#CBD5E1" strokeWidth="4" strokeLinecap="round" />
+            <circle cx="50" cy="8" r="6" fill="#FFB86C" className="animate-ping" style={{animationDuration: '2s', transformOrigin: 'center'}} />
+            <circle cx="50" cy="8" r="6" fill="#FFB86C" />
+            <rect x="20" y="25" width="60" height="45" rx="15" fill="#8B5CF6" />
+            <rect x="28" y="33" width="44" height="25" rx="8" fill="#1E293B" />
+            <path d="M36 45 Q40 40 44 45" stroke="#34D399" strokeWidth="4" strokeLinecap="round" fill="none" />
+            <path d="M56 45 Q60 40 64 45" stroke="#34D399" strokeWidth="4" strokeLinecap="round" fill="none" />
+            <path d="M35 75 L65 75 L60 95 L40 95 Z" fill="#7C3AED" />
+            <path d="M15 50 Q5 60 15 75" stroke="#A78BFA" strokeWidth="6" strokeLinecap="round" fill="none" />
+            <path d="M85 50 Q95 60 85 75" stroke="#A78BFA" strokeWidth="6" strokeLinecap="round" fill="none" />
+          </svg>
         </button>
+      </div>
+
+      {/* --- MODAL EDIT TASK AVEC CHAMP DATE TEXTUEL --- */}
+      {editingTask && (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setEditingTask(null)} />
+          <div className="relative bg-white rounded-[2rem] p-6 w-full max-w-sm shadow-2xl transform transition-all">
+            <button onClick={() => setEditingTask(null)} className="absolute top-4 right-4 p-2 text-slate-400 hover:bg-slate-100 active:scale-95 rounded-full transition-colors"><X className="w-5 h-5" /></button>
+            <div className="flex items-center gap-3 mb-6">
+              <div className="bg-purple-100 p-2.5 rounded-xl text-[#8B5CF6]"><Pencil className="w-5 h-5" /></div>
+              <h2 className="text-xl font-black text-slate-800">Modifier la tâche</h2>
+            </div>
+            <form onSubmit={handleUpdateTask}>
+              <div className="mb-4">
+                <label className="block text-sm font-bold text-slate-600 mb-2">Titre</label>
+                <input type="text" autoFocus className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 font-bold text-base sm:text-lg text-slate-700 outline-none focus:border-[#8B5CF6] focus:ring-2 focus:ring-[#E9D5FF] transition-all" value={editTaskTitle} onChange={(e) => setEditTaskTitle(e.target.value)} />
+              </div>
+              <div className="flex gap-4 mb-4">
+                <div className="flex-1">
+                  <label className="block text-xs font-bold text-slate-500 mb-1.5">Date</label>
+                  <div className="relative flex items-center">
+                    <Calendar className="w-4 h-4 text-slate-400 absolute left-3 pointer-events-none" />
+                    <input type="text" placeholder="JJ/MM/AAAA" maxLength="10" className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-9 pr-4 py-2.5 text-sm font-bold text-slate-700 outline-none focus:border-[#8B5CF6] focus:ring-2 focus:ring-[#E9D5FF] transition-all" value={editTaskDateDisplay} onChange={handleDateChangeText} />
+                  </div>
+                </div>
+                <div className="w-[100px]">
+                  <label className="block text-xs font-bold text-slate-500 mb-1.5">Heure</label>
+                  <input type="text" placeholder="12:00" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold text-slate-700 outline-none text-center focus:border-[#8B5CF6] focus:ring-2 focus:ring-[#E9D5FF] transition-all" value={editTaskTime} onChange={(e) => handleTimeChange(e, setEditTaskTime)} onBlur={() => formatTimeOnBlur(editTaskTime, setEditTaskTime)} />
+                </div>
+              </div>
+              <div className="mb-6 relative">
+                <label className="block text-xs font-bold text-slate-500 mb-1.5">Catégorie</label>
+                <select className="w-full appearance-none bg-slate-50 border border-slate-200 rounded-xl px-4 pr-10 py-2.5 text-sm font-bold text-slate-700 outline-none focus:border-[#8B5CF6] focus:ring-2 focus:ring-[#E9D5FF] transition-all cursor-pointer" value={editTaskCategoryId} onChange={(e) => setEditTaskCategoryId(e.target.value)}>
+                  <option value="">Général</option>
+                  {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
+                <ChevronDown className="w-4 h-4 absolute right-4 bottom-3 text-slate-400 pointer-events-none" />
+              </div>
+              <button type="submit" disabled={!editTaskTitle.trim()} className="w-full bg-slate-800 hover:bg-slate-900 active:scale-95 text-white font-bold py-3.5 rounded-xl transition-all disabled:opacity-50 shadow-lg">Mettre à jour</button>
+            </form>
+          </div>
+        </div>
       )}
 
-      {/* --- ASSISTANT SIDEBAR --- */}
-      <div className={`fixed inset-y-0 right-0 z-50 w-full sm:w-[400px] bg-white sm:bg-white/95 sm:backdrop-blur-3xl shadow-2xl transform transition-transform duration-500 flex flex-col ${isAssistantOpen ? 'translate-x-0' : 'translate-x-full'}`}>
-        <div className="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between bg-gradient-to-r from-purple-50 to-pink-50">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 flex-shrink-0">
-              <EmethHead className="w-full h-full drop-shadow-sm" />
+      {/* --- MODAL CATEGORIE --- */}
+      {isCategoryModalOpen && (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setIsCategoryModalOpen(false)} />
+          <div className="relative bg-white rounded-[2rem] p-6 w-full max-w-sm shadow-2xl transform transition-all">
+            <button onClick={() => setIsCategoryModalOpen(false)} className="absolute top-4 right-4 p-2 text-slate-400 hover:bg-slate-100 active:scale-95 rounded-full transition-colors"><X className="w-5 h-5" /></button>
+            <div className="flex items-center gap-3 mb-6">
+              <div className="bg-purple-100 p-2.5 rounded-xl text-[#8B5CF6]"><Palette className="w-5 h-5" /></div>
+              <h2 className="text-xl font-black text-slate-800">Catégorie</h2>
             </div>
-            <div>
-              <h3 className="font-black text-slate-800 text-base sm:text-lg">Emeth</h3>
-              <p className="text-[10px] sm:text-xs text-[#8B5CF6] font-bold">Votre assistant</p>
-            </div>
-          </div>
-          <button onClick={() => setIsAssistantOpen(false)} className="p-2 bg-white rounded-full text-slate-400 hover:text-slate-700 active:scale-95 shadow-sm transition-transform hover:scale-110"><X className="w-5 h-5" /></button>
-        </div>
-
-        <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50/50">
-          {messages.map((msg, idx) => (
-            <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-              <div className={`max-w-[85%] p-3 sm:p-4 rounded-2xl sm:rounded-3xl text-sm shadow-sm ${msg.role === 'user' ? 'bg-gradient-to-br from-[#8B5CF6] to-[#7C3AED] text-white rounded-tr-sm' : 'bg-white text-slate-700 border border-slate-100 rounded-tl-sm'}`}>
-                {msg.text.split('\n').map((line, i) => <p key={i} className="mb-1 last:mb-0">{line}</p>)}
+            <form onSubmit={handleCreateCategory}>
+              <div className="mb-5">
+                <label className="block text-sm font-bold text-slate-600 mb-2">Nom</label>
+                <input type="text" autoFocus placeholder="Ex: Perso, Pro..." className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 font-bold text-base sm:text-lg text-slate-700 outline-none focus:border-[#8B5CF6] focus:ring-2 focus:ring-[#E9D5FF] transition-all" value={newCategoryName} onChange={(e) => setNewCategoryName(e.target.value)} />
               </div>
-            </div>
-          ))}
-          {isTyping && (
-            <div className="flex justify-start">
-              <div className="bg-white p-3 rounded-2xl rounded-tl-sm border border-slate-100 flex items-center gap-2"><Loader className="w-4 h-4 animate-spin text-[#8B5CF6]" /></div>
-            </div>
-          )}
-          <div ref={messagesEndRef} />
+              <div className="mb-6">
+                <label className="block text-sm font-bold text-slate-600 mb-2">Couleur</label>
+                <div className="flex flex-wrap gap-4 sm:gap-5 justify-center mt-4">
+                  {CATEGORY_COLORS.map(color => <button key={color} type="button" onClick={() => setNewCategoryColor(color)} className={`w-8 h-8 sm:w-10 sm:h-10 rounded-full transition-all active:scale-95 shadow-sm ${newCategoryColor === color ? 'scale-125 ring-4 ring-offset-2 ring-[#E9D5FF]' : 'hover:scale-110'}`} style={{ backgroundColor: color }} />)}
+                </div>
+              </div>
+              <button type="submit" disabled={!newCategoryName.trim()} className="w-full bg-slate-800 hover:bg-slate-900 active:scale-95 text-white font-bold py-3.5 rounded-xl transition-all disabled:opacity-50 shadow-lg">Créer</button>
+            </form>
+          </div>
         </div>
-
-        <div className="p-3 sm:p-4 bg-white border-t border-slate-100 pb-safe">
-          <form onSubmit={handleSendMessage} className="flex items-center gap-2 bg-slate-100/80 p-1.5 sm:p-2 rounded-full border border-slate-200 focus-within:border-[#8B5CF6] focus-within:ring-2 focus-within:ring-[#E9D5FF] focus-within:bg-white transition-all">
-            <input type="text" value={inputMessage} onChange={(e) => setInputMessage(e.target.value)} placeholder="Demandez-moi un conseil !" className="flex-1 bg-transparent border-none outline-none px-3 text-sm text-slate-700" />
-            <button type="submit" disabled={!inputMessage.trim() || isTyping} className="p-2 sm:p-2.5 bg-[#8B5CF6] hover:bg-[#7C3AED] active:scale-95 text-white rounded-full disabled:opacity-50 transition-all shadow-sm"><Send className="w-4 h-4 ml-0.5" /></button>
-          </form>
-        </div>
-      </div>
+      )}
 
       {/* --- MODAL RÉGLAGES --- */}
       {isSettingsOpen && (
@@ -938,7 +1028,7 @@ export default function App() {
             </div>
             <form onSubmit={handleSaveSettings} className="space-y-4">
               <div>
-                <label className="block text-xs font-bold text-slate-500 mb-1.5 flex items-center gap-1.5"><User className="w-3.5 h-3.5"/> Prénom (Pour Emeth)</label>
+                <label className="block text-xs font-bold text-slate-500 mb-1.5 flex items-center gap-1.5"><User className="w-3.5 h-3.5"/> Prénom</label>
                 <input type="text" placeholder="Comment vous appeler ?" value={settingsName} onChange={(e) => setSettingsName(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-[#8B5CF6] focus:ring-2 focus:ring-[#E9D5FF] transition-all" />
               </div>
               <div>
