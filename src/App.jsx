@@ -622,7 +622,7 @@ export default function App() {
     for (let i = 1; i <= daysInMonth; i++) days.push(i);
 
     return (
-      <div className="bg-white/80 backdrop-blur-xl rounded-[2rem] p-4 sm:p-6 shadow-xl shadow-indigo-100/50 border border-white mx-auto flex flex-col h-[75vh] w-full max-w-6xl">
+      <div className="bg-white/80 backdrop-blur-xl rounded-[2rem] p-4 sm:p-6 shadow-xl shadow-indigo-100/50 border border-white max-w-6xl mx-auto flex flex-col h-[75vh] w-full">
         <div className="flex flex-col sm:flex-row items-center justify-between mb-4 sm:mb-6 gap-3 sm:gap-4">
           <h3 className="text-xl sm:text-2xl font-black text-slate-800 capitalize">{monthNames[month]} {year}</h3>
           <div className="flex gap-2 w-full sm:w-auto justify-between sm:justify-start">
@@ -757,20 +757,27 @@ export default function App() {
           renderCalendar()
         ) : (
           <div className="w-full max-w-5xl flex flex-col gap-4 sm:gap-6">
-            <form onSubmit={handleCreateTask} className="w-full bg-white/90 backdrop-blur-xl rounded-[1.5rem] sm:rounded-[2rem] p-2 shadow-xl shadow-indigo-100/50 border border-white flex flex-col sm:flex-row items-center gap-2 relative z-20">
+            
+            {/* BARRE DE CRÉATION 100% RESPONSIVE (1 ligne sur PC, 2 lignes sur Mobile) */}
+            <form onSubmit={handleCreateTask} className="w-full bg-white/90 backdrop-blur-xl rounded-[1.5rem] sm:rounded-[2rem] p-2 shadow-xl shadow-indigo-100/50 border border-white flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-4 relative z-20">
+              
+              {/* Ligne 1 sur Mobile (Titre) */}
               <input 
                 type="text" 
                 placeholder="Que voulez-vous accomplir ?" 
-                className="flex-1 w-full bg-transparent border-none outline-none px-4 py-2 sm:py-3 text-slate-700 placeholder:text-slate-400 font-bold text-base sm:text-lg min-w-[120px]"
+                className="w-full bg-slate-50 sm:bg-transparent border border-slate-100 sm:border-none outline-none px-4 py-3 sm:py-3 rounded-xl sm:rounded-none text-slate-700 placeholder:text-slate-400 font-bold text-base sm:text-lg min-w-[120px] focus:ring-2 focus:ring-[#E9D5FF] sm:focus:ring-0"
                 value={newTaskTitle} onChange={(e) => setNewTaskTitle(e.target.value)}
               />
               
+              {/* Ligne 2 sur Mobile (Outils + Bouton) */}
               <div className="flex w-full sm:w-auto items-center justify-between sm:justify-end gap-1.5 sm:gap-2">
+                
+                {/* DATE */}
                 <div className="relative shrink-0 flex-1 sm:flex-none">
                   <button type="button" onClick={() => setIsDatePickerOpen(true)} className="flex items-center justify-center sm:justify-between bg-slate-50/80 hover:bg-[#E9D5FF]/40 border border-slate-200 focus:border-[#8B5CF6] focus:ring-2 focus:ring-[#E9D5FF] rounded-xl sm:rounded-2xl px-2 sm:px-4 py-2.5 w-full sm:w-[130px] transition-all active:scale-95">
                     <div className="flex items-center overflow-hidden">
                       <Calendar className="w-4 h-4 text-slate-400 shrink-0 sm:mr-2" />
-                      <span className={`text-xs sm:text-sm font-bold truncate hidden sm:block ${newTaskDate ? 'text-slate-700' : 'text-slate-400'}`}>
+                      <span className={`text-[10px] sm:text-sm font-bold truncate ${newTaskDate ? 'text-slate-700' : 'text-slate-400'}`}>
                         {newTaskDate && !isNaN(new Date(newTaskDate).getTime()) ? new Date(newTaskDate).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' }) : 'Date'}
                       </span>
                     </div>
@@ -785,23 +792,29 @@ export default function App() {
                   )}
                 </div>
 
-                <div className="flex flex-1 sm:flex-none items-center justify-center sm:justify-start bg-slate-50/80 hover:bg-[#E9D5FF]/40 border border-slate-200 rounded-xl sm:rounded-2xl px-2 sm:px-4 py-2.5 w-full sm:w-[120px] shrink-0 focus-within:ring-2 focus-within:ring-[#E9D5FF] focus-within:border-[#8B5CF6] transition-all">
-                  <Clock className="w-4 h-4 text-slate-400 shrink-0 sm:mr-2" />
+                {/* HEURE */}
+                <div className="flex flex-1 sm:flex-none items-center justify-center sm:justify-start bg-slate-50/80 hover:bg-[#E9D5FF]/40 border border-slate-200 rounded-xl sm:rounded-2xl px-2 sm:px-4 py-2.5 w-full sm:w-[100px] shrink-0 focus-within:ring-2 focus-within:ring-[#E9D5FF] focus-within:border-[#8B5CF6] transition-all">
+                  <Clock className="w-4 h-4 text-slate-400 shrink-0 mr-1 sm:mr-2" />
                   <input 
                     type="text" inputMode="numeric" placeholder="12:00" maxLength="5"
-                    className="w-full bg-transparent border-none p-0 text-xs sm:text-sm font-bold text-slate-600 outline-none text-center sm:text-left hidden sm:block"
+                    className="w-full bg-transparent border-none p-0 text-[10px] sm:text-sm font-bold text-slate-600 outline-none text-left"
                     value={newTaskTime} 
                     onChange={(e) => handleTimeChange(e, setNewTaskTime)}
                     onBlur={() => formatTimeOnBlur(newTaskTime, setNewTaskTime)} 
                   />
                 </div>
 
-                <select className="flex-1 sm:flex-none bg-slate-50/80 hover:bg-[#E9D5FF]/40 border border-slate-200 rounded-xl sm:rounded-2xl px-2 sm:px-4 py-2.5 text-xs sm:text-sm font-bold outline-none w-full sm:w-[130px] shrink-0 truncate cursor-pointer transition-all focus:ring-2 focus:ring-[#E9D5FF] focus:border-[#8B5CF6]" value={newTaskCategoryId} onChange={(e) => setNewTaskCategoryId(e.target.value)} style={{ color: newTaskCategoryId ? getCategoryColor(newTaskCategoryId) : '#64748B' }}>
-                  <option value="" style={{color: '#64748B'}}>Général</option>
-                  {categories.map(c => <option key={c.id} value={c.id} style={{color: c.color}}>{c.name}</option>)}
-                </select>
+                {/* CATÉGORIE */}
+                <div className="relative shrink-0 flex-1 sm:flex-none">
+                  <select className="w-full appearance-none bg-slate-50/80 hover:bg-[#E9D5FF]/40 border border-slate-200 rounded-xl sm:rounded-2xl pl-2 pr-6 sm:px-4 sm:pr-8 py-2.5 text-[10px] sm:text-sm font-bold outline-none sm:w-[130px] truncate cursor-pointer transition-all focus:ring-2 focus:ring-[#E9D5FF] focus:border-[#8B5CF6]" value={newTaskCategoryId} onChange={(e) => setNewTaskCategoryId(e.target.value)} style={{ color: newTaskCategoryId ? getCategoryColor(newTaskCategoryId) : '#64748B' }}>
+                    <option value="" style={{color: '#64748B'}}>Général</option>
+                    {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                  </select>
+                  <ChevronDown className="w-3.5 h-3.5 absolute right-1.5 sm:right-2.5 top-[12px] sm:top-[13px] text-slate-400 pointer-events-none" />
+                </div>
 
-                <button type="submit" disabled={!newTaskTitle.trim()} className="bg-gradient-to-r from-[#8B5CF6] to-[#7C3AED] text-white w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-full shadow-md disabled:opacity-50 flex items-center justify-center shrink-0 hover:scale-105 active:scale-95 transition-all">
+                {/* BOUTON PLUS */}
+                <button type="submit" disabled={!newTaskTitle.trim()} className="bg-gradient-to-r from-[#8B5CF6] to-[#7C3AED] text-white w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-full shadow-md disabled:opacity-50 flex items-center justify-center shrink-0 hover:scale-105 active:scale-95 transition-all ml-1 sm:ml-0">
                   <Plus className="w-5 h-5" />
                 </button>
               </div>
