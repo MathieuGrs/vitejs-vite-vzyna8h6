@@ -12,12 +12,13 @@ import {
 
 // --- CONFIGURATION FIREBASE (Remplissez avec vos clés Firebase de l'étape 3) ---
 const firebaseConfig = {
-  apiKey: "AIzaSyBXo7p0Mx2ApGxhJ6SEBbQJ1C4eNaxqVxE",
+  apiKey: "AIzaSyBXO7p0Mx2ApGxhJ6SEBbQJ1C4eNaxqVxE",
   authDomain: "flow-9e70c.firebaseapp.com",
   projectId: "flow-9e70c",
   storageBucket: "flow-9e70c.firebasestorage.app",
   messagingSenderId: "477448412331",
-  appId: "1:477448412331:web:e652b99377a64d68276bee"
+  appId: "1:477448412331:web:e652b99377a64d68276bee",
+  measurementId: "G-N886HYXHBJ"
 };
 
 const app = initializeApp(firebaseConfig);
