@@ -758,7 +758,7 @@ export default function App() {
         ) : (
           <div className="w-full max-w-5xl flex flex-col gap-4 sm:gap-6">
             
-            {/* BARRE DE CRÉATION 100% RESPONSIVE (1 ligne sur PC, 2 lignes sur Mobile) */}
+            {/* BARRE DE CRÉATION 100% RESPONSIVE */}
             <form onSubmit={handleCreateTask} className="w-full bg-white/90 backdrop-blur-xl rounded-[1.5rem] sm:rounded-[2rem] p-2 shadow-xl shadow-indigo-100/50 border border-white flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-4 relative z-20">
               
               {/* Ligne 1 sur Mobile (Titre) */}
@@ -792,8 +792,8 @@ export default function App() {
                   )}
                 </div>
 
-                {/* HEURE */}
-                <div className="flex flex-1 sm:flex-none items-center justify-center sm:justify-start bg-slate-50/80 hover:bg-[#E9D5FF]/40 border border-slate-200 rounded-xl sm:rounded-2xl px-2 sm:px-4 py-2.5 w-full sm:w-[100px] shrink-0 focus-within:ring-2 focus-within:ring-[#E9D5FF] focus-within:border-[#8B5CF6] transition-all">
+                {/* HEURE (Corrigé à w-[120px] sur desktop) */}
+                <div className="flex flex-1 sm:flex-none items-center justify-center sm:justify-start bg-slate-50/80 hover:bg-[#E9D5FF]/40 border border-slate-200 rounded-xl sm:rounded-2xl px-2 sm:px-4 py-2.5 w-full sm:w-[120px] shrink-0 focus-within:ring-2 focus-within:ring-[#E9D5FF] focus-within:border-[#8B5CF6] transition-all">
                   <Clock className="w-4 h-4 text-slate-400 shrink-0 mr-1 sm:mr-2" />
                   <input 
                     type="text" inputMode="numeric" placeholder="12:00" maxLength="5"
@@ -984,7 +984,7 @@ export default function App() {
                     <input type="text" placeholder="JJ/MM/AAAA" maxLength="10" className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-9 pr-4 py-2.5 text-sm font-bold text-slate-700 outline-none focus:border-[#8B5CF6] focus:ring-2 focus:ring-[#E9D5FF] transition-all" value={editTaskDateDisplay} onChange={handleDateChangeText} />
                   </div>
                 </div>
-                <div className="w-[100px]">
+                <div className="w-[120px]">
                   <label className="block text-xs font-bold text-slate-500 mb-1.5">Heure</label>
                   <input type="text" placeholder="12:00" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold text-slate-700 outline-none text-center focus:border-[#8B5CF6] focus:ring-2 focus:ring-[#E9D5FF] transition-all" value={editTaskTime} onChange={(e) => handleTimeChange(e, setEditTaskTime)} onBlur={() => formatTimeOnBlur(editTaskTime, setEditTaskTime)} />
                 </div>
